@@ -3,32 +3,23 @@ import json
 import argparse
 from datetime import datetime
 import pandas as pd
+import calendar
 
 EXPENSES_FILE = "expenses.json"
 BUDGETS_FILE = "budget.json"
 
-def load_file():
-    if not os.path.exists("expenses.json"):
+def load_files(path):
+    if not os.path.exists(f"{path}.json"):
         return []
-    with open("expenses.json", "r") as file:
-        return json.load(file)
+    with open(f"{path}.json", "r") as file:
+        return json.load(file)  
     
-def save_expense(expense):
-    with open("expenses.json", "w") as file:
-        json.dump(expense, file, indent=2)
-
-def load_file_budget():
-    if not os.path.exists("budget.json"):
-        return []
-    with open("budget.json", "r") as file:
-        return json.load(file)       
-    
-def save_budgets(budget):
-    with open("budget.json", "w") as file:
-        json.dump(budget, file)    
+def save_files(info, path):
+    with open(f"{path}.json", "w") as file:
+        json.dump(info, file, indent=2) 
 
 def add_budget(month, amount):
-    budgets = load_file_budget()
+    budgets = load_files('budget_file')
 
     if month not in range(1,13):
         print('The month must be a number between 1 and 12')
@@ -38,60 +29,55 @@ def add_budget(month, amount):
         budgets.append(budget)
     else:
         budgets[0][f'{month}'] = amount
-    save_budgets(budgets)
+    save_files(budgets, 'budget_file')
     print(f"Budget for the month {month} successfully saved")  
 
 def summary_for_budget(expenses, month):  
     summary = [expense['amount'] if expense['amount'] is not None and datetime.strptime(expense['date'], '%Y-%m-%d').month == month else 0 for expense in expenses]
     return sum(summary)
 
-def budget_expenses_vs(current_day, expenses):
-    budgets = load_file_budget()
+def budget_expenses_difference(current_month, expenses):
+    budgets = load_files('budget_file')
 
     existents_months = 0 if not budgets else budgets[0].keys()  
 
     if existents_months != 0:
-        if f'{current_day}' in list(existents_months):
-            current_budget = budgets[0][f'{current_day}']        
-            total_expenses = summary_for_budget(expenses, current_day)
+        if f'{current_month}' in list(existents_months):
+            current_budget = budgets[0][f'{current_month}']        
+            total_expenses = summary_for_budget(expenses, current_month)
             if total_expenses > current_budget:
-                print(f'your budget for the month {current_day} has been exceeded. Budget: {current_budget}, Total expenses: {total_expenses}')
+                print(f'your budget for the month {current_month} has been exceeded. Budget: {current_budget}, Total expenses: {total_expenses}')
 
 
 def add_expense(description, amount, category):
-    expenses = load_file() 
-    current_day = datetime.now()
-
-    ids_list = 1 if not expenses else [id_number['id'] for id_number in expenses]
+    expenses = load_files('expenses_file') 
+    current_month = datetime.now()
+    id_expense = len(expenses)+1
 
     expense = {
-        'id': 1 if ids_list == 1 else ids_list[-1]+1,
-        'date': current_day.strftime("%Y-%m-%d"),
+        'id': id_expense,
+        'date': current_month.strftime("%Y-%m-%d"),
         'description': description,
         'amount': amount,
         'category': category
     } 
+
     expenses.append(expense)
-
-    budget_expenses_vs(current_day.month, expenses)
-
-    save_expense(expenses)
+    budget_expenses_difference(current_month.month, expenses)
+    save_files(expenses, 'expenses_file')
     print(f"Expense added successfully (ID: {expense['id']})")  
 
 def exist_expense(id):
-    expenses = load_file()
+    expenses = load_files('expenses_file')
     current_state = False
-    
     exist = any(expense['id']==id for expense in expenses)
     if exist:
         current_state = True
-
     return current_state     
 
 def update_expense(id, description=None, amount=None, category=None):   
-    expenses = load_file()
+    expenses = load_files('expenses_file')
     exist = exist_expense(id)
-    current_day = 0
 
     if not exist:
         print(f"Expense with id:{id} doesn't exist")
@@ -102,12 +88,12 @@ def update_expense(id, description=None, amount=None, category=None):
             expense['description'] = expense['description'] if description is None else description
             expense['amount'] = expense['amount'] if amount is None else amount
             expense['category'] = expense['category'] if category is None else category
-            current_day = (datetime.strptime(expense['date'], '%Y-%m-%d').month)
+            current_month = (datetime.strptime(expense['date'], '%Y-%m-%d').month)
 
     if amount is not None:
-        budget_expenses_vs(current_day, expenses)
+        budget_expenses_difference(current_month, expenses)
   
-    save_expense(expenses)
+    save_files(expenses, 'expenses_file')
     print(f"Expense whit id:{id} updated successfully") 
 
 def delete_expense(id):
@@ -116,14 +102,14 @@ def delete_expense(id):
     if not exist:
         print(f"Expense with id:{id} dosen't exist")
         return
-
-    expenses = load_file()
+    
+    expenses = load_files('expenses_file')
     new_expenses = [expense for expense in expenses if expense['id'] != id]
-    save_expense(new_expenses)
+    save_files(new_expenses, 'expenses_file')
     print(f"Expense with id:{id} successfully deleted")
 
 def view_expenses(category=None):
-    expenses = load_file()
+    expenses = load_files('expenses_file')
 
     if not expenses:
         print("You don't have expenses registered")
@@ -139,7 +125,7 @@ def view_expenses(category=None):
     print(all_expenses)
 
 def summary(month=None):
-    expenses = load_file()
+    expenses = load_files('expenses_file')
 
     if not expenses:
         print(f"You don't have expenses registered")
@@ -156,24 +142,11 @@ def summary(month=None):
     else:    
         expenses_summary = [expense['amount'] if (datetime.strptime(expense['date'], '%Y-%m-%d').month) == month and expense['amount'] is not None else 0 for expense in expenses]
 
-        months = {
-            1: "Enero",
-            2: "Febrero",
-            3: "Marzo",
-            4: "Abril",
-            5: "Mayo",
-            6: "Junio",
-            7: "Julio",
-            8: "Agosto",
-            9: "Septiembre",
-            10: "Octubre",
-            11: "Noviembre",
-            12: "Diciembre"
-        }
-        print(f"Total expenses for {months[month]}: ${sum(expenses_summary)}")  
+        months_name = calendar.month_name[month]
+        print(f"Total expenses for {months_name}: ${sum(expenses_summary)}")  
 
 def convertoexcel():
-    expenses = load_file()
+    expenses = load_files('expenses_file')
     df_expenses = pd.DataFrame(expenses)
     df_expenses.to_csv('my_expenses.csv', index=False)
 
